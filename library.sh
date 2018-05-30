@@ -165,7 +165,7 @@ do_release() {
     if [ -n "${release_snapshots}" ]; then
         maven_args="clean package deploy:deploy $maven_opts"
     else
-        maven_args="-B release:clean release:prepare release:perform -DconnectionUrl=scm:git:file://`pwd`/.git -Dtag=$release_version $maven_opts"
+        maven_args="-B release:clean release:prepare release:perform -DconnectionUrl=scm:git:file://`pwd`/.git -DreleaseVersion=${release_version} -Dtag=$release_version -DpushChanges=false $maven_opts"
     fi
 
     mvn $maven_args
