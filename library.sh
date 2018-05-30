@@ -43,7 +43,7 @@ find_staging_repo_id() {
     local maven_args="org.sonatype.plugins:nexus-staging-maven-plugin:${NEXUS_STAGING_PLUGIN_VERSION}:rc-list -DnexusUrl=${nexus_url} -DserverId=${nexus_server_id} $maven_opts"
 
     mvn $maven_args | grep ${staging_repo_prefix} | head -n 1 | awk -F " " '{print $2}'
-    }
+}
 #
 # Closes a staging repository on nexus.
 close_staging_repository() {
@@ -136,10 +136,10 @@ maven_release() {
     else
         echo "Releasing staging repository: $repo_id"
         trap "echo Done!" EXIT
-        exit
         release_staging_repository "$repo_id"  "$nexus_url" "$nexus_server_id" "$maven_opts"
         git push origin master
         git push orign $tag
+        exit
     fi
 }
 
@@ -155,20 +155,25 @@ do_release() {
 
     if [ -n "${dev_version}" ]; then
         maven_opts="$maven_opts -DdevelopmentVersion=${dev_version}"
+        mvn $maven_args
     else
         current_version=$(find_project_version)
         if [ -n "${current_version}" ]; then
-        maven_opts="$maven_opts -DdevelopmentVersion=${current_version}"
+            maven_opts="$maven_opts -DdevelopmentVersion=${current_version}"
+            mvn $maven_args
         fi
     fi
 
     if [ -n "${release_snapshots}" ]; then
         maven_args="clean package deploy:deploy $maven_opts"
+        mvn $maven_args
     else
-        maven_args="-B release:clean release:prepare release:perform -DconnectionUrl=scm:git:file://`pwd`/.git -DreleaseVersion=${release_version} -Dtag=$release_version -DpushChanges=false $maven_opts"
-    fi
+        maven_args="-B release:clean release:prepare -DreleaseVersion=${release_version} -Dtag=$release_version -DpushChanges=false $maven_opts"
+        mvn $maven_args
 
-    mvn $maven_args
+        maven_args="-B release:perform -DconnectionUrl=scm:git:file://`pwd`/.git -DreleaseVersion=${release_version} -Dtag=${release_version} $maven_opts" 
+        mvn $maven_args
+    fi
 }
 
 do_cleanup() {
