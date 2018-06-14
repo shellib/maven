@@ -1,0 +1,32 @@
+* maven
+  Maven shell utilities
+
+** Features
+*** automating releases
+
+** Automating Releases
+   
+   For automating the release of a maven project the maven_release function is provided:
+   
+   For example:
+   
+   #+BEGIN_SRC shell
+     #!/bin/bash
+
+     source $(grab github.com/shellib/maven)
+
+     pushd workspace/src/github.com/sundrio/sundrio/
+     maven_release --release-version 0.8.1 --dev-version 0.8-SNAPSHOT
+     popd
+   #+END_SRC
+   
+   The actual options supported by the command are:
+
+   | Option               | Required | Description                                           |
+   |----------------------+----------+-------------------------------------------------------|
+   | --release-version    | true     | The release version                                   |
+   | --dev-version        | true     | The version that will be set after the release        |
+   | --release-snapshots  | false    | Release snapshot artifacts                            |
+   | --staging-profile-id | false    | The staging profile id (as seen in the nexus console) |
+   | --nexus-rul          | false    | The nexus server url                                  |
+   | --dry-run            | false    | Dry run. No release will take place                   |

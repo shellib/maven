@@ -1,2 +1,0 @@
-# maven
-Maven shell utilities
