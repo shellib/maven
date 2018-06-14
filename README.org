@@ -1,5 +1,5 @@
 * maven
-  Maven shell utilities
+  Maven shell utilities that use the [[https://github.com/shellib/grab][grab]] layout.
 
 ** Features
 *** automating releases
