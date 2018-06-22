@@ -3,6 +3,7 @@
 
 ** Features
 *** automating releases
+*** check if artifact is available on repo.
 
 ** Automating Releases
    
@@ -30,3 +31,30 @@
    | --staging-profile-id | false    | The staging profile id (as seen in the nexus console) |
    | --nexus-rul          | false    | The nexus server url                                  |
    | --dry-run            | false    | Dry run. No release will take place                   |
+
+** Checking if artifact is available on repository.   
+   
+   When automating a release process its often desirable to wait until the release is available and synchronization of artifacts to the target repository has been completed.
+   For this purpose *is_release_available* has been created. This function accepts two arguments (groupId, artifactId and version) and optionally the repository url and return true or false.   
+
+
+   | Option     | Required | Description                                                  |
+   |------------+----------+--------------------------------------------------------------|
+   | --repo-url | true     | The url of the target repository (including the path prefix) |
+   |            |          |                                                              |
+
+This function is meant to be used along with a polling mechanism. 
+
+For example it can play nicely with [[https://github.com/shellib/wait][shellib's wait utility]].
+
+#+BEGIN_SRC shell
+  #!/bin/bash
+  source $(grab github.com/shellib/maven)
+  source $(grab github.com/shellib/wait)
+
+  is_on_central() {
+      is_release_available my.group.id my-artifact-id 1.0.0
+  }
+
+  wait_for --function is_on_central --backoff-multiplier 3 --max-wait-time 7200
+#+END_SRC

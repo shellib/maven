@@ -6,6 +6,8 @@ DEFAULT_NEXUS_URL="https://oss.sonatype.org"
 DEFAULT_NEXUS_STAGING_PLUGIN_VERSION="1.6.8"
 DEFAULT_NEXUS_SERVER_ID="oss-sonatype-staging"
 
+DEFAULT_REPO_URL="http://repo1.maven.org/maven2"
+
 REPO_ANNOUNCEMENT_PREFIX="OpenedStagingProfile"
 
 
@@ -60,6 +62,26 @@ release_staging_repository() {
 # Drops a staging repository on nexus.
 drop_staging_repository() {
     with_staging_repository "drop" $*
+}
+
+#
+# Check if maven release is available
+is_release_available() {
+    local groupId=$1
+    local artifactId=$2
+    local version=$3
+
+    if [ -z "$groupId" ] || [ -z "$artifactId" ] || [ -z "$version" ]; then
+        exit 1
+    fi
+
+    local repo_url=$(or $(readopt --repo-url $*) $DEFAULT_REPO_URL)
+    local group_path=`echo $groupId | sed "s/\./\//g"`
+    local artifact_url="$repo_url/$group_path/$artifactId/$version/"
+    local status_code=`curl -o /dev/null -sw '%{http_code}' $artifact_url`
+    if [ $status_code -eq 200 ]; then
+        echo "true"
+    fi
 }
 
 #
