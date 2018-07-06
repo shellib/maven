@@ -86,7 +86,7 @@ is_release_available() {
 
 #
 # Performs the actual release
-release() {
+__release() {
     local staging_profile_id=$(readopt --staging-profile-id $*)
     local nexus_server_id=$(or $(readopt --nexus-server-id $*) $DEFAULT_NEXUS_SERVER_ID)
     local nexus_url=$(or $(readopt --nexus-url $*) $DEFAULT_NEXUS_URL)
@@ -186,12 +186,15 @@ prepare_and_perform() {
 
     if [ -n "${release_snapshots}" ]; then
         maven_args="clean package deploy:deploy $maven_opts"
+        echo "mvn $maven_args"
         mvn $maven_args
     else
         maven_args="-B release:clean release:prepare -DreleaseVersion=${release_version} -Dtag=$release_version -DpushChanges=false $maven_opts"
+        echo "mvn $maven_args"
         mvn $maven_args
 
         maven_args="-B release:perform -DconnectionUrl=scm:git:file://`pwd`/.git -DreleaseVersion=${release_version} -Dtag=${release_version} $maven_opts" 
+        echo "mvn $maven_args"
         mvn $maven_args
     fi
 }
