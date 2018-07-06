@@ -86,7 +86,7 @@ is_release_available() {
 
 #
 # Performs the actual release
-maven_release() {
+release() {
     local staging_profile_id=$(readopt --staging-profile-id $*)
     local nexus_server_id=$(or $(readopt --nexus-server-id $*) $DEFAULT_NEXUS_SERVER_ID)
     local nexus_url=$(or $(readopt --nexus-url $*) $DEFAULT_NEXUS_URL)
@@ -100,13 +100,11 @@ maven_release() {
     #Validation
     if [ -z "${release_snapshots}" ]; then
         if [ -z "${release_version}" ]; then
-            echo "Please specify --release-version"
-            exit 1
+            release_version=`next_release_version`
         fi
 
         if [ -z "${dev_version}" ]; then
-            echo "Please specify --dev-version"
-            exit 1
+            dev_version=`next_dev_version`
         fi
     fi
 
@@ -130,12 +128,12 @@ maven_release() {
         repo_id=$(open_staging_repository "$staging_profile_id" "$nexus_url" "$nexus_server_id" "$maven_opts")
         echo "Opened staging repository: $repo_id"
         #There is no tag yet, so let's pass $NO_TAG instead.
-        trap "do_cleanup \"$repo_id\" \"$NO_TAG\" \"$maven_opts\"" EXIT
-        do_release "$release_snapshots" "$release_version" "$dev_version" "$maven_opts"
+        trap "release_cleanup \"$repo_id\" \"$NO_TAG\" \"$maven_opts\"" EXIT
+        prepare_and_perform "$release_snapshots" "$release_version" "$dev_version" "$maven_opts"
     else
-        do_release "$release_snapshots" "$release_version" "$dev_version" "$maven_opts"
+        prepare_and_perform "$release_snapshots" "$release_version" "$dev_version" "$maven_opts"
         #There is no tag yet, so let's pass $NO_TAG instead.
-        trap "do_cleanup \"$repo_id\" \"$NO_TAG\" \"$maven_opts\"" EXIT
+        trap "release_cleanup \"$repo_id\" \"$NO_TAG\" \"$maven_opts\"" EXIT
         repo_id=`find_staging_repo_id $maven_opts`
     fi
 
@@ -143,7 +141,7 @@ maven_release() {
     if [ -z "${release_snapshots}" ]; then
         #Update the trap with the tag created.
         local tag=$(find_tag)
-        trap "do_cleanup \"$repo_id\" \"$tag\" \"$maven_opts\"" EXIT
+        trap "release_cleanup \"$repo_id\" \"$tag\" \"$maven_opts\"" EXIT
     fi
 
     echo "Closing staging repository: $repo_id"
@@ -167,7 +165,7 @@ maven_release() {
 
 #
 # Helper functions
-do_release() {
+prepare_and_perform() {
     local release_snapshots=$1
     local release_version=$2
     local dev_version=$4
@@ -198,7 +196,7 @@ do_release() {
     fi
 }
 
-do_cleanup() {
+release_cleanup() {
     echo "Cleaning up ..."
     local repo_id=$1
     local tag=$2
@@ -226,8 +224,63 @@ find_project_version() {
     mvn -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive org.codehaus.mojo:exec-maven-plugin:1.3.1:exec 2>/dev/null
 }
 
+major_version() {
+    echo $1 | cut -d "." -f1 | cut -d "-" -f1
+}
+
+minor_version() {
+    echo $1 | cut -d "." -f2 | cut -d "-" -f1
+}
+
+micro_version() {
+    echo $1 | cut -d "." -f3 | cut -d "-" -f1
+}
+
+micro_suffix() {
+    echo $1 | cut -d "-" -f2
+}
+
 find_staging_repo_prefix() {
     find_group_id | sed "s/\.//g"
+}
+
+next_release_version() {
+    local version=`find_project_version`
+    local major=`major_version $version`
+    local minor=`minor_version $version`
+    local micro=`micro_version $version`
+    local suffix=`micro_suffix $version`
+    # if there is no micro version, we need to check the latest release.
+    if [ -z "$micro" ]; then
+        local latest=`find_latest_release`
+        local latest_micro=`micro_version $latest`
+        echo "$major.$minor.$((latest_micro+1))"
+    elif [ -z "$suffix" ] || [ "SNAPSHOT" == "$suffix" ]; then
+       echo "$major.$minor.$micro"
+    else
+       echo "$major.$minor.$micro-$suffix"
+    fi
+}
+
+next_dev_version() {
+    local version=`find_project_version`
+    local major=`major_version $version`
+    local minor=`minor_version $version`
+    local micro=`micro_version $version`
+    local suffix=`micro_suffix $version`
+    # if there is no micro version, we need to check the latest release.
+    if [ -z "$micro" ]; then
+        echo "$version"
+    else
+       echo "$major.$minor.$((micro+1))-$suffix"
+    fi
+
+}
+
+find_latest_release() {
+    local major=$1
+    local minor=$2
+    git tag -l | grep "$major\\.$minor\\." 
 }
 
 #Only run maven_release if script is not sourced.

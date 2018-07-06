@@ -23,14 +23,20 @@
    
    The actual options supported by the command are:
 
-   | Option               | Required | Description                                           |
-   |----------------------+----------+-------------------------------------------------------|
-   | --release-version    | true     | The release version                                   |
-   | --dev-version        | true     | The version that will be set after the release        |
-   | --release-snapshots  | false    | Release snapshot artifacts                            |
-   | --staging-profile-id | false    | The staging profile id (as seen in the nexus console) |
-   | --nexus-rul          | false    | The nexus server url                                  |
-   | --dry-run            | false    | Dry run. No release will take place                   |
+   | Option               | Required | Description                                                              |
+   |----------------------+----------+--------------------------------------------------------------------------|
+   | --release-version    | false    | The release version (will bump micro version if missing)                 |
+   | --dev-version        | false    | The version that will be set after the release (will bump micro version) |
+   | --release-snapshots  | false    | Release snapshot artifacts                                               |
+   | --staging-profile-id | false    | The staging profile id (as seen in the nexus console)                    |
+   | --nexus-rul          | false    | The nexus server url                                                     |
+   | --dry-run            | false    | Dry run. No release will take place                                      |
+
+** Skipping version   
+   If the options for release and dev version are skipped, they will be calculated with the following rules:
+   
+   - If the version found in the pom.xml uses MAJROR.MINOR.MICRO-SNAPSHOT style, then the release version will be MAJOR.MINOR.MICRO and the dev version will be MAJOR.MINOR.MICRO + 1.
+   - If the version found in the pom.xml uses MAJOR.MINOR-SNAPSHOT style, then the dev version will be kept the same and the release version will be calculated using the MICRO of latest release with matching MAJOR and MINOR versions + 1.
 
 ** Checking if artifact is available on repository.   
    
