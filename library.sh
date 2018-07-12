@@ -168,7 +168,7 @@ __release() {
 prepare_and_perform() {
     local release_snapshots=$1
     local release_version=$2
-    local dev_version=$4
+    local dev_version=$3
     local maven_opts=$4
 
     local maven_args=""
