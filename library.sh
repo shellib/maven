@@ -158,7 +158,7 @@ __release() {
         trap "echo Done!" EXIT
         release_staging_repository "$repo_id"  "$nexus_url" "$nexus_server_id" "$maven_opts"
         git push origin master
-        git push orign $tag
+        git push origin $tag
         exit
     fi
 }
