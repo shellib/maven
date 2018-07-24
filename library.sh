@@ -175,12 +175,10 @@ prepare_and_perform() {
 
     if [ -n "${dev_version}" ]; then
         maven_opts="$maven_opts -DdevelopmentVersion=${dev_version}"
-        mvn $maven_args
     else
         current_version=$(find_project_version)
         if [ -n "${current_version}" ]; then
             maven_opts="$maven_opts -DdevelopmentVersion=${current_version}"
-            mvn $maven_args
         fi
     fi
 
