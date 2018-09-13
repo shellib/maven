@@ -281,7 +281,7 @@ next_dev_version() {
 find_latest_release() {
     local major=$1
     local minor=$2
-    git tag -l | grep "$major\\.$minor\\." 
+    git tag -l | grep "^$major\\.$minor\\." | sort | tail -n 1
 }
 
 #Only run maven_release if script is not sourced.
