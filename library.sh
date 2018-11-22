@@ -1,6 +1,7 @@
 #!/bin/bash
 
 source $(grab github.com/shellib/cli)
+source $(grab github.com/shellib/wait)
 
 DEFAULT_NEXUS_URL="https://oss.sonatype.org"
 DEFAULT_NEXUS_STAGING_PLUGIN_VERSION="1.6.8"
@@ -10,78 +11,46 @@ DEFAULT_REPO_URL="http://repo1.maven.org/maven2"
 
 REPO_ANNOUNCEMENT_PREFIX="OpenedStagingProfile"
 
+usage::release() {
+echo "Perform a maven release (via nexus).
 
-#
-# Opens a staging repository on nexus.
-open_staging_repository() {
-    local staging_profile_id=$1
-    local nexus_url=${2:-$DEFAULT_NEXUS_URL}
-    local nexus_server_id=${3:-$NEXUS_SERVER_ID}
-    local maven_opts=$4
-    local maven_args="org.sonatype.plugins:nexus-staging-maven-plugin:${NEXUS_STAGING_PLUGIN_VERSION}:rc-open -DnexusUrl=${nexus_url} -DserverId=${nexus_server_id} -DstagingProfileId=${staging_profile_id} -DopenedRepositoryMessageFormat='$REPO_ANNOUNCEMENT_PREFIX:%s' $maven_opts"
-    #Call maven and just grab the last line that contains $REPO_ANNOUNCEMENT_PREFIX discard the line that displays the whole command and get the string that is between `:` and `'`.
-    mvn $maven_args | grep -v maven | grep $REPO_ANNOUNCEMENT_PREFIX | awk -F ":" '{print $2}' | awk -F "'" '{print $1}'
-}
+Requirements:
 
-#
-# Performs an action on the staging repository
-# Supported actions (close, release, drop)
-with_staging_repository() {
-    local action=$1
-    local repo_id=$2
-    local nexus_url=${3:-$DEFAULT_NEXUS_URL}
-    local nexus_server_id=${4:-$NEXUS_SERVER_ID}
-    local maven_opts=$5
-    local maven_args="org.sonatype.plugins:nexus-staging-maven-plugin:${NEXUS_STAGING_PLUGIN_VERSION}:rc-${action} -DnexusUrl=${nexus_url} -DserverId=${nexus_server_id} -DstagingRepositoryId=$repo_id $maven_opts"
-    mvn $maven_args > /dev/null
-}
+The artifacts (usually if not always) need to be signed. Setting up gpg and configuring credentials is beyond the scope of this tool.
+The same applies to managing credentials of the nexus server. So the following assumptions regarding the setup are made:
 
-#
-# Find the staging repository id.
-# This is useful in case where the staging repo has been implicitly created by the maven-release-plugin.
-find_staging_repo_id() {
-    local maven_opts=$1
-    local staging_repo_prefix=`find_staging_repo_prefix`
-    local maven_args="org.sonatype.plugins:nexus-staging-maven-plugin:${NEXUS_STAGING_PLUGIN_VERSION}:rc-list -DnexusUrl=${nexus_url} -DserverId=${nexus_server_id} $maven_opts"
+1. Target nexus server is configured in distribution management of the pom and the credentials are configured in the settings.xml (a matching server entry should exist in settings.xml).
 
-    mvn $maven_args | grep ${staging_repo_prefix} | head -n 1 | awk -F " " '{print $2}'
-}
-#
-# Closes a staging repository on nexus.
-close_staging_repository() {
-    with_staging_repository "close" $*
-}
+     <server>
+        <id>your_server_id</id> <!-- correlates with the distribution management server found in the pom -->
+        <username>your_username</username>
+        <password>your_password</password>
+    </server>
 
-#
-# Releases a staging repository on nexus.
-release_staging_repository() {
-    with_staging_repository "release" $*
-}
+2. gpg is available locally and the key is configured in settings.xml:
 
-#
-# Drops a staging repository on nexus.
-drop_staging_repository() {
-    with_staging_repository "drop" $*
-}
+    <profile>
+            <id>your_profile_here</id>
+            <properties>
+                    <gpg.command>/usr/local/bin/gpg</gpg.command>
+                    <gpg.keyname>your_gpg_key_here </gpg.keyname>
+                    <gpg.passphrase>your_key_passphrase_here</gpg.passphrase>
+            </properties>
+    </profile>
 
-#
-# Check if maven release is available
-is_release_available() {
-    local groupId=$1
-    local artifactId=$2
-    local version=$3
+Options and Flags:
+ --release-version                 The version to release (defaults to the next micro version).
+ --dev-version                     The version to set after the release (defaults to majosr-minor-SNAPSHOT).
+ --profiles                        Profiles to enable. Refers to maven profiles (works like mvn -P).
+ --settings-xml                    Path to the settings.xml  (defaults to system default)
 
-    if [ -z "$groupId" ] || [ -z "$artifactId" ] || [ -z "$version" ]; then
-        exit 1
-    fi
+ --staging-profile-id              The nexus staging profile id (usually its safe to ignore).
+ --nexus-server-id                 The nexus server id (defaults to the value set in distribution management section of the pom).
+ --nexus-url                       The url to the nexus server  (defaults to https://oss.sonatype.org, should be based handled in the pom)
 
-    local repo_url=$(or $(readopt --repo-url $*) $DEFAULT_REPO_URL)
-    local group_path=`echo $groupId | sed "s/\./\//g"`
-    local artifact_url="$repo_url/$group_path/$artifactId/$version/"
-    local status_code=`curl -o /dev/null -sw '%{http_code}' $artifact_url`
-    if [ $status_code -eq 200 ]; then
-        echo "true"
-    fi
+ --wait-for-sync-timeout           The amount of time to wait (in seconds) until artifacts have been synced (defaults to 0).
+ --sync-repo-uri                   The uri of the repository that the artifacts will be synced (defaults to https://repo1.maven.org/maven2/).
+"
 }
 
 #
@@ -165,6 +134,82 @@ __release() {
 
 #
 # Helper functions
+
+
+#
+# Opens a staging repository on nexus.
+open_staging_repository() {
+    local staging_profile_id=$1
+    local nexus_url=${2:-$DEFAULT_NEXUS_URL}
+    local nexus_server_id=${3:-$NEXUS_SERVER_ID}
+    local maven_opts=$4
+    local maven_args="org.sonatype.plugins:nexus-staging-maven-plugin:${NEXUS_STAGING_PLUGIN_VERSION}:rc-open -DnexusUrl=${nexus_url} -DserverId=${nexus_server_id} -DstagingProfileId=${staging_profile_id} -DopenedRepositoryMessageFormat='$REPO_ANNOUNCEMENT_PREFIX:%s' $maven_opts"
+    #Call maven and just grab the last line that contains $REPO_ANNOUNCEMENT_PREFIX discard the line that displays the whole command and get the string that is between `:` and `'`.
+    mvn $maven_args | grep -v maven | grep $REPO_ANNOUNCEMENT_PREFIX | awk -F ":" '{print $2}' | awk -F "'" '{print $1}'
+}
+
+#
+# Performs an action on the staging repository
+# Supported actions (close, release, drop)
+with_staging_repository() {
+    local action=$1
+    local repo_id=$2
+    local nexus_url=${3:-$DEFAULT_NEXUS_URL}
+    local nexus_server_id=${4:-$NEXUS_SERVER_ID}
+    local maven_opts=$5
+    local maven_args="org.sonatype.plugins:nexus-staging-maven-plugin:${NEXUS_STAGING_PLUGIN_VERSION}:rc-${action} -DnexusUrl=${nexus_url} -DserverId=${nexus_server_id} -DstagingRepositoryId=$repo_id $maven_opts"
+    mvn $maven_args > /dev/null
+}
+
+#
+# Find the staging repository id.
+# This is useful in case where the staging repo has been implicitly created by the maven-release-plugin.
+find_staging_repo_id() {
+    local maven_opts=$1
+    local staging_repo_prefix=`find_staging_repo_prefix`
+    local maven_args="org.sonatype.plugins:nexus-staging-maven-plugin:${NEXUS_STAGING_PLUGIN_VERSION}:rc-list -DnexusUrl=${nexus_url} -DserverId=${nexus_server_id} $maven_opts"
+
+    mvn $maven_args | grep ${staging_repo_prefix} | head -n 1 | awk -F " " '{print $2}'
+}
+
+#
+# Closes a staging repository on nexus.
+close_staging_repository() {
+    with_staging_repository "close" $*
+}
+
+#
+# Releases a staging repository on nexus.
+release_staging_repository() {
+    with_staging_repository "release" $*
+}
+
+#
+# Drops a staging repository on nexus.
+drop_staging_repository() {
+    with_staging_repository "drop" $*
+}
+
+#
+# Check if maven release is available
+is_release_available() {
+    local groupId=$1
+    local artifactId=$2
+    local version=$3
+
+    if [ -z "$groupId" ] || [ -z "$artifactId" ] || [ -z "$version" ]; then
+        exit 1
+    fi
+
+    local repo_url=$(or $(readopt --repo-url $*) $DEFAULT_REPO_URL)
+    local group_path=`echo $groupId | sed "s/\./\//g"`
+    local artifact_url="$repo_url/$group_path/$artifactId/$version/"
+    local status_code=`curl -o /dev/null -sw '%{http_code}' $artifact_url`
+    if [ $status_code -eq 200 ]; then
+        echo "true"
+    fi
+}
+
 prepare_and_perform() {
     local release_snapshots=$1
     local release_version=$2
@@ -283,8 +328,3 @@ find_latest_release() {
     local minor=$2
     git tag -l | grep "^$major\\.$minor\\." | sort | tail -n 1
 }
-
-#Only run maven_release if script is not sourced.
-if [ -n "$1" ]; then
-    maven_release $*
-fi
