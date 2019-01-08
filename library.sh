@@ -298,7 +298,7 @@ next_release_version() {
     local suffix=`micro_suffix $version`
     # if there is no micro version, we need to check the latest release.
     if [ -z "$micro" ]; then
-        local latest=`find_latest_release`
+        local latest=`find_latest_release $major $minor`
         local latest_micro=`micro_version $latest`
         echo "$major.$minor.$((latest_micro+1))"
     elif [ -z "$suffix" ] || [ "SNAPSHOT" == "$suffix" ]; then
