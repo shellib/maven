@@ -239,6 +239,7 @@ prepare_and_perform() {
         maven_args="-B release:perform -DconnectionUrl=scm:git:file://`pwd`/.git -DreleaseVersion=${release_version} -Dtag=${release_version} $maven_opts" 
         echo "mvn $maven_args"
         mvn $maven_args
+	git push --tags
     fi
 }
 
