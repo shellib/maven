@@ -128,6 +128,7 @@ __release() {
         release_staging_repository "$repo_id"  "$nexus_url" "$nexus_server_id" "$maven_opts"
         git push origin master
         git push origin $tag
+	git push origin --tags
         exit
     fi
 }
@@ -239,7 +240,6 @@ prepare_and_perform() {
         maven_args="-B release:perform -DconnectionUrl=scm:git:file://`pwd`/.git -DreleaseVersion=${release_version} -Dtag=${release_version} $maven_opts" 
         echo "mvn $maven_args"
         mvn $maven_args
-	git push --tags
     fi
 }
 
